@@ -1,0 +1,130 @@
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const chatForm = document.getElementById('chat-form');
+        const userInput = document.getElementById('user-input');
+        const chatMessages = document.getElementById('chat-messages');
+        const typingIndicator = document.getElementById('typing-indicator');
+        
+        // Function to add a message to the chat
+        function addMessage(content, isUser = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'chat-message flex items-start';
+            
+            if (isUser) {
+                messageDiv.className += ' justify-end';
+                messageDiv.innerHTML = `
+                    <div class="mr-3 bg-blue-600 p-3 rounded-lg max-w-3xl">
+                        <p class="text-white">${escapeHtml(content)}</p>
+                    </div>
+                    <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center text-gray-600">
+                        <i class="fas fa-user"></i>
+                    </div>
+                `;
+            } else {
+                messageDiv.innerHTML = `
+                    <div class="flex-shrink-0 h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center text-white">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <div class="ml-3 bg-blue-100 p-3 rounded-lg max-w-3xl">
+                        <p class="text-gray-800">${content}</p>
+                    </div>
+                `;
+            }
+            
+            chatMessages.appendChild(messageDiv);
+            
+            // Add animation after a small delay to trigger transition
+            setTimeout(() => {
+                messageDiv.classList.add('show');
+            }, 10);
+            
+            // Scroll to the bottom of chat
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+        
+        // Function to escape HTML
+        function escapeHtml(unsafe) {
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+        
+        // Function to convert URLs to clickable links
+        function linkify(text) {
+            const urlRegex = /(https?:\/\/[^\s]+)/g;
+            return text.replace(urlRegex, url => `<a href="${url}" target="_blank" class="text-blue-600 underline">${url}</a>`);
+        }
+        
+        // Function to process markdown-like formatting
+        function formatText(text) {
+            // Convert line breaks
+            let formatted = text.replace(/\n/g, '<br>');
+            
+            // Convert URLs to links
+            formatted = linkify(formatted);
+            
+            // Bold text
+            formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            
+            // Italic text
+            formatted = formatted.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            
+            return formatted;
+        }
+        
+        // Handle form submission
+        chatForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const message = userInput.value.trim();
+            if (!message) return;
+            
+            // Clear input
+            userInput.value = '';
+            
+            // Add user message to chat
+            addMessage(message, true);
+            
+            // Show typing indicator
+            typingIndicator.classList.remove('hidden');
+            
+            try {
+                // Send message to API
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ query: message })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('API request failed');
+                }
+                
+                const data = await response.json();
+                
+                // Hide typing indicator
+                typingIndicator.classList.add('hidden');
+                
+                // Add bot response to chat
+                addMessage(formatText(data.response));
+                
+            } catch (error) {
+                console.error('Error:', error);
+                
+                // Hide typing indicator
+                typingIndicator.classList.add('hidden');
+                
+                // Show error message
+                addMessage('Sorry, I encountered an error processing your request. Please try again.');
+            }
+        });
+        
+        // Focus input field on load
+        userInput.focus();
+    });
+</script>
